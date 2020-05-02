@@ -1,0 +1,8 @@
+name: CommandPrompter
+version: ${project.version}
+main: me.hsgamer.commandprompter.CommandPrompter
+api-version: "1.13"
+
+commands:
+  testprompt:
+    description: "A test command"
