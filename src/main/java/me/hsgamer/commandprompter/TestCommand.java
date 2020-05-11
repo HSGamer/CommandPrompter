@@ -2,7 +2,7 @@ package me.hsgamer.commandprompter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -20,7 +20,7 @@ public class TestCommand implements CommandExecutor {
       questions.add("How old are you??");
 
       CommandPrompter.getTaskChainFactory().newChain()
-          .<Map<String,String>>asyncFirstCallback(next -> {
+          .asyncFirstFuture(() -> CompletableFuture.supplyAsync(() -> {
             Conversation conversation = CommandPrompter.getQuestionnaireFactory()
                 .withQuestion(questions)
                 .withLocalEcho(true)
@@ -28,17 +28,10 @@ public class TestCommand implements CommandExecutor {
                 .buildConversation((Conversable) sender);
 
             conversation.begin();
+            waitForResult(conversation);
 
-            while (conversation.getState() == ConversationState.STARTED) {
-              try {
-                Thread.sleep(1000);
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
-            }
-
-            next.accept(QuestionnaireFactory.getAnswer(conversation));
-          })
+            return QuestionnaireFactory.getAnswer(conversation);
+          }))
           .syncLast(input -> {
             sender.sendMessage("called");
             input.forEach((q, a) -> {
@@ -46,10 +39,21 @@ public class TestCommand implements CommandExecutor {
               sender.sendMessage("- " + a);
             });
           })
+          .sync(() -> sender.sendMessage("FINISH"))
           .execute();
+      sender.sendMessage("Send out");
       return true;
     }
     return false;
   }
 
+  private synchronized void waitForResult(Conversation conversation) {
+    while (conversation.getState() == ConversationState.STARTED) {
+      try {
+        this.wait(1);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
 }
